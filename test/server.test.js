@@ -1,3 +1,4 @@
+// This file contains tests for the Express server using the tap testing framework and supertest for HTTP assertions. It tests user authentication, preferences management, and news retrieval endpoints.
 const tap = require('tap');
 const supertest = require('supertest');
 const app = require('../app');
@@ -29,6 +30,8 @@ tap.test('POST /users/signup with missing email', async (t) => {
     t.end();
 });
 
+//Login tests
+// "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImNsYXJrQHN1cGVybWFuLmNvbSIsImlhdCI6MTc4MDQxMjM3NCwiZXhwIjoxNzgwNDE1OTc0fQ.nTWM3ZsIs_RUzg5xzLjdFgVBa5Jbl_5rDijDpW937tE"
 tap.test('POST /users/login', async (t) => { 
     const response = await server.post('/users/login').send({
         email: mockUser.email,
@@ -92,10 +95,4 @@ tap.test('GET /news without token', async (t) => {
     const response = await server.get('/news');
     t.equal(response.status, 401);
     t.end();
-});
-
-
-
-tap.teardown(() => {
-    process.exit(0);
 });
