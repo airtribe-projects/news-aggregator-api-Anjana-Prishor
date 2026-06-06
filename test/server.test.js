@@ -30,6 +30,40 @@ tap.test('POST /register with missing email', async (t) => {
     t.end();
 });
 
+tap.test('POST /register with invalid email', async (t) => {
+    const response = await server.post('/register').send({
+        name: mockUser.name,
+        email: 'not-an-email',
+        password: mockUser.password
+    });
+    t.equal(response.status, 400);
+    t.equal(response.body.error, 'A valid email is required');
+    t.end();
+});
+
+tap.test('POST /register with short password', async (t) => {
+    const response = await server.post('/register').send({
+        name: mockUser.name,
+        email: 'small@pass.com',
+        password: '123'
+    });
+    t.equal(response.status, 400);
+    t.equal(response.body.error, 'Password must be at least 6 characters');
+    t.end();
+});
+
+tap.test('POST /register with invalid preferences', async (t) => {
+    const response = await server.post('/register').send({
+        name: 'Bruce Wayne',
+        email: 'bruce@wayne.com',
+        password: 'DarkKnight1',
+        preferences: 'technology'
+    });
+    t.equal(response.status, 400);
+    t.equal(response.body.error, 'Preferences must be an array of strings');
+    t.end();
+});
+
 //Login tests
 // "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImNsYXJrQHN1cGVybWFuLmNvbSIsImlhdCI6MTc4MDQxMjM3NCwiZXhwIjoxNzgwNDE1OTc0fQ.nTWM3ZsIs_RUzg5xzLjdFgVBa5Jbl_5rDijDpW937tE"
 tap.test('POST /login', async (t) => { 
@@ -49,6 +83,15 @@ tap.test('POST /login with wrong password', async (t) => {
         password: 'wrongpassword'
     });
     t.equal(response.status, 401);
+    t.end();
+});
+
+tap.test('POST /login with missing password', async (t) => {
+    const response = await server.post('/login').send({
+        email: mockUser.email
+    });
+    t.equal(response.status, 400);
+    t.equal(response.body.error, 'Password is required');
     t.end();
 });
 
@@ -75,6 +118,15 @@ tap.test('PUT /preferences', async (t) => {
     t.equal(response.status, 200);
 });
 
+tap.test('PUT /preferences with invalid preferences', async (t) => {
+    const response = await server.put('/preferences').set('Authorization', `Bearer ${token}`).send({
+        preferences: 'not-an-array'
+    });
+    t.equal(response.status, 400);
+    t.equal(response.body.error, 'Preferences must be an array of strings');
+    t.end();
+});
+
 tap.test('Check PUT /preferences', async (t) => {
     const response = await server.get('/preferences').set('Authorization', `Bearer ${token}`);
     t.equal(response.status, 200);
@@ -93,6 +145,12 @@ tap.test('GET /news', async (t) => {
 
 tap.test('GET /news without token', async (t) => {
     const response = await server.get('/news');
+    t.equal(response.status, 401);
+    t.end();
+});
+
+tap.test('GET /news with invalid token', async (t) => {
+    const response = await server.get('/news').set('Authorization', 'Bearer invalid.token.value');
     t.equal(response.status, 401);
     t.end();
 });
