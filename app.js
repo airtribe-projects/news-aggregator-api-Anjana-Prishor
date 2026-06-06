@@ -1,6 +1,7 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const axios = require('axios');
 require('dotenv').config();
 
 const app = express();
@@ -90,6 +91,7 @@ const buildFallbackNews = (preferences) => {
   }));
 };
 
+// Fetch news from external API (GNews)
 const fetchExternalNews = async (preferences) => {
   const query = preferences.length ? preferences.join(' OR ') : 'latest';
   const url = new URL('https://gnews.io/api/v4/search');
@@ -98,9 +100,8 @@ const fetchExternalNews = async (preferences) => {
   url.searchParams.set('max', '10');
   url.searchParams.set('token', NEWS_API_KEY);
 
-  const response = await fetch(url.toString());
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.message || 'External news API error');
+    const response = await axios.get(url.toString());
+  const data = response.data;
 
   return Array.isArray(data.articles)
     ? data.articles.map((article) => ({
@@ -113,6 +114,7 @@ const fetchExternalNews = async (preferences) => {
     : [];
 };
 
+// News handler with caching
 const getNewsHandler = async (req, res) => {
   const cacheKey = `${req.user.email}:${req.user.preferences.join(',')}`;
   const cached = newsCache[cacheKey];
@@ -135,9 +137,9 @@ const errorHandler = (err, req, res, next) => {
 
 // --- Routes ---
 app.post('/register', signupHandler);
-app.post('/users/login', loginHandler);
-app.get('/users/preferences', authenticate, getPreferencesHandler);
-app.put('/users/preferences', authenticate, putPreferencesHandler);
+app.post('/login', loginHandler);
+app.get('/preferences', authenticate, getPreferencesHandler);
+app.put('/preferences', authenticate, putPreferencesHandler);
 app.get('/news', authenticate, getNewsHandler);
 
 app.use(errorHandler);
