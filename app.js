@@ -139,15 +139,30 @@ const fetchExternalNews = async (preferences) => {
     : [];
 };
 
-// News handler with caching
-const getNewsHandler = async (req, res) => {
-  const cacheKey = `${req.user.email}:${req.user.preferences.join(',')}`;
+// Async cache helpers
+const getCachedNews = async (cacheKey) => {
   const cached = newsCache[cacheKey];
-  if (cached && Date.now() - cached.timestamp < NEWS_CACHE_TTL_MS) return res.status(200).json({ news: cached.articles, source: 'cache' });
+  if (cached && Date.now() - cached.timestamp < NEWS_CACHE_TTL_MS) {
+    return cached.articles;
+  }
+  return null;
+};
+
+const setCachedNews = async (cacheKey, articles) => {
+  newsCache[cacheKey] = { timestamp: Date.now(), articles };
+};
+
+// News handler with async cache
+const getNewsHandler = async (req, res) => {
+  const prefs = req.user.preferences || [];
+  const cacheKey = `${req.user.email}:${prefs.join(',')}`;
 
   try {
-    const articles = NEWS_API_KEY ? await fetchExternalNews(req.user.preferences) : buildFallbackNews(req.user.preferences);
-    newsCache[cacheKey] = { timestamp: Date.now(), articles };
+    const cachedArticles = await getCachedNews(cacheKey);
+    if (cachedArticles) return res.status(200).json({ news: cachedArticles, source: 'cache' });
+
+    const articles = NEWS_API_KEY ? await fetchExternalNews(prefs) : buildFallbackNews(prefs);
+    await setCachedNews(cacheKey, articles);
     return res.status(200).json({ news: articles, source: NEWS_API_KEY ? 'gnews' : 'mock' });
   } catch (error) {
     return res.status(502).json({ error: error.message || 'Unable to fetch news' });
