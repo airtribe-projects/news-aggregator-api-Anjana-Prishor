@@ -17,8 +17,33 @@ const newsCache = {};
 app.use(express.json());
 
 // --- Validators ---
+const isNonEmptyString = (value) => typeof value === 'string' && value.trim().length > 0;
 const validateEmail = (email) => typeof email === 'string' && /^\S+@\S+\.\S+$/.test(email);
-const validatePreferences = (preferences) => Array.isArray(preferences) && preferences.every((item) => typeof item === 'string');
+const validatePassword = (password) => typeof password === 'string' && password.length >= 6;
+const validatePreferences = (preferences) => Array.isArray(preferences) && preferences.every((item) => isNonEmptyString(item));
+
+const validateRegisterData = (body) => {
+  if (!body || typeof body !== 'object') return 'Request body must be a JSON object';
+  if (!isNonEmptyString(body.name)) return 'Name is required';
+  if (!validateEmail(body.email)) return 'A valid email is required';
+  if (!validatePassword(body.password)) return 'Password must be at least 6 characters';
+  if (body.preferences !== undefined && !validatePreferences(body.preferences)) return 'Preferences must be an array of strings';
+  return null;
+};
+
+const validateLoginData = (body) => {
+  if (!body || typeof body !== 'object') return 'Request body must be a JSON object';
+  if (!isNonEmptyString(body.email)) return 'Email is required';
+  if (!isNonEmptyString(body.password)) return 'Password is required';
+  return null;
+};
+
+const validatePreferencesData = (body) => {
+  if (!body || typeof body !== 'object') return 'Request body must be a JSON object';
+  if (!Object.prototype.hasOwnProperty.call(body, 'preferences')) return 'Preferences are required';
+  if (!validatePreferences(body.preferences)) return 'Preferences must be an array of strings';
+  return null;
+};
 
 // --- Middleware ---
 const authenticate = (req, res, next) => {
@@ -42,23 +67,22 @@ const authenticate = (req, res, next) => {
 
 // --- Auth handlers ---
 const signupHandler = async (req, res) => {
-  const { name, email, password, preferences } = req.body;
+  const validationError = validateRegisterData(req.body);
+  if (validationError) return res.status(400).json({ error: validationError });
 
-  if (!name || !email || !password) return res.status(400).json({ error: 'Name, email, and password are required' });
-  if (!validateEmail(email)) return res.status(400).json({ error: 'A valid email is required' });
-  if (typeof password !== 'string' || password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+  const { name, email, password, preferences = [] } = req.body;
   if (users[email]) return res.status(409).json({ error: 'User already exists' });
-  if (preferences !== undefined && !validatePreferences(preferences)) return res.status(400).json({ error: 'Preferences must be an array of strings' });
 
   const passwordHash = await bcrypt.hash(password, 10);
-  users[email] = { name, email, passwordHash, preferences: preferences || [] };
+  users[email] = { name, email, passwordHash, preferences };
   return res.status(200).json({ message: 'Signup successful' });
 };
 
 const loginHandler = async (req, res) => {
-  const { email, password } = req.body;
-  if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
+  const validationError = validateLoginData(req.body);
+  if (validationError) return res.status(400).json({ error: validationError });
 
+  const { email, password } = req.body;
   const user = users[email];
   if (!user) return res.status(401).json({ error: 'Invalid email or password' });
 
@@ -70,12 +94,13 @@ const loginHandler = async (req, res) => {
 };
 
 // --- Preferences handlers ---
-const getPreferencesHandler = (req, res) => res.status(200).json({ preferences: req.user.preferences });
+const getPreferencesHandler = (req, res) => res.status(200).json({ preferences: req.user.preferences || [] });
 
 const putPreferencesHandler = (req, res) => {
-  const { preferences } = req.body;
-  if (!validatePreferences(preferences)) return res.status(400).json({ error: 'Preferences must be an array of strings' });
-  req.user.preferences = preferences;
+  const validationError = validatePreferencesData(req.body);
+  if (validationError) return res.status(400).json({ error: validationError });
+
+  req.user.preferences = req.body.preferences;
   return res.status(200).json({ preferences: req.user.preferences });
 };
 
@@ -132,6 +157,9 @@ const getNewsHandler = async (req, res) => {
 // --- Error handler ---
 const errorHandler = (err, req, res, next) => {
   console.error(err);
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    return res.status(400).json({ error: 'Invalid JSON payload' });
+  }
   res.status(500).json({ error: 'Internal server error' });
 };
 
