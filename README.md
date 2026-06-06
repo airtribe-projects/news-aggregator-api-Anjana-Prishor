@@ -97,3 +97,8 @@ Returns personalized news articles based on saved preferences.
 - The API uses in-memory storage for users and preferences.
 - If `NEWS_API_KEY` is not configured, the `/news` endpoint returns fallback mock news.
 
+### Caching
+
+- The `/news` endpoint uses a simple in-memory cache keyed by `userEmail:preferences` to reduce external API calls.
+- Cache entries are stored for a short TTL defined in the code as `NEWS_CACHE_TTL_MS` (default: 60000 ms / 1 minute).
+- The cache is updated asynchronously when a miss occurs; subsequent requests within the TTL return cached articles.
